@@ -526,6 +526,11 @@ export function renderApp(): string {
     $("searchAccounts").addEventListener("click", () => run(loadAccounts));
 
     $("mergeAccounts").addEventListener("click", () => run(async () => {
+      if (!$("mergeOa1").value && !$("mergeOa2").value) {
+        setMessage("請先在同步帳號列表按「選取」，或手動輸入 OA1/OA2 LINE User ID", "warn");
+        return;
+      }
+
       const data = await api("/api/synced/merge", {
         method: "POST",
         body: JSON.stringify({
