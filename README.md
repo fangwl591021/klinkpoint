@@ -170,3 +170,24 @@ npm run dev
 - 前端不要直接呼叫 wetw-point API，避免 API Key 外洩。
 - 正式上線前請更換已外露的 API Key。
 - 若 `point_balance` 不一定可靠，建議請原外掛補一支「查目前餘額」API，核銷會更安全。
+
+## WordPress 會員 UID API
+
+`wordpress-plugin/klinkpoint-users` 提供一個 WordPress 外掛，用來從 `wp_usermeta` 匯出會員的 LINE UID：
+
+```text
+GET /wp-json/klinkpoint/v1/users
+```
+
+安裝後到 WordPress：
+
+```text
+Settings -> KlinkPoint Users
+```
+
+複製 API Key，再用：
+
+```bash
+curl "https://k-link.cc/wp-json/klinkpoint/v1/users?role=wetw_ai_vip&per_page=100" \
+  -H "x-klinkpoint-api-key: YOUR_PLUGIN_API_KEY"
+```
