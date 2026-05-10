@@ -5,6 +5,7 @@ import {
   createMember,
   hasOperation,
   autoMergeByWpUserId,
+  importWpLineUsers,
   mergeSyncedAccounts,
   recordOperation,
   saveSyncedPointItems,
@@ -224,6 +225,30 @@ async function autoMergeRoute(_request: Request, env: Env): Promise<Response> {
   return json({ success: true, ...result });
 }
 
+async function importWpUsersRoute(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<{
+    source?: string;
+    users?: Array<{
+      wp_user_id: number;
+      user_login?: string;
+      display_name?: string;
+      email?: string;
+      line_user_id: string;
+    }>;
+  }>(request);
+
+  if (!Array.isArray(body.users)) {
+    throw new HttpError(400, "users must be an array");
+  }
+
+  const result = await importWpLineUsers(env, {
+    source: body.source ?? "k-link.cc",
+    users: body.users
+  });
+
+  return json({ success: true, ...result });
+}
+
 async function checkinRoute(request: Request, env: Env): Promise<Response> {
   const body = await readJson<Record<string, unknown>>(request);
   requireFields(body, ["member_id", "provider_key"]);
@@ -361,6 +386,7 @@ const routes: Record<string, RouteHandler> = {
   "GET /api/synced/accounts": syncedAccountsRoute,
   "POST /api/synced/merge": mergeSyncedRoute,
   "POST /api/synced/auto-merge": autoMergeRoute,
+  "POST /api/wp-users/import": importWpUsersRoute,
   "POST /api/points/checkin": checkinRoute,
   "POST /api/points/grant": grantRoute,
   "POST /api/points/redeem": redeemRoute

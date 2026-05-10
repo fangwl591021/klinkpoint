@@ -67,3 +67,18 @@ CREATE INDEX IF NOT EXISTS idx_synced_point_accounts_member_id
 
 CREATE INDEX IF NOT EXISTS idx_synced_point_entries_line_user
   ON synced_point_entries(provider_key, line_user_id);
+
+CREATE TABLE IF NOT EXISTS imported_wp_line_users (
+  source TEXT NOT NULL,
+  wp_user_id INTEGER NOT NULL,
+  user_login TEXT,
+  display_name TEXT,
+  email TEXT,
+  line_user_id TEXT NOT NULL,
+  raw_json TEXT NOT NULL,
+  imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(source, wp_user_id, line_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_imported_wp_line_users_line_user
+  ON imported_wp_line_users(line_user_id);

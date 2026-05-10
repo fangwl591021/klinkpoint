@@ -319,3 +319,71 @@ export async function autoMergeByWpUserId(env: Env): Promise<{
     members
   };
 }
+
+export async function importWpLineUsers(
+  env: Env,
+  options: {
+    source: string;
+    users: Array<{
+      wp_user_id: number;
+      user_login?: string;
+      display_name?: string;
+      email?: string;
+      line_user_id: string;
+    }>;
+  }
+): Promise<{ imported: number; linked_accounts: number; created_members: number }> {
+  let imported = 0;
+  let linkedAccounts = 0;
+  let createdMembers = 0;
+  const source = options.source || "k-link.cc";
+
+  for (const user of options.users) {
+    if (!user.wp_user_id || !user.line_user_id) continue;
+
+    await env.DB.prepare(
+      `INSERT OR REPLACE INTO imported_wp_line_users (
+        source, wp_user_id, user_login, display_name, email, line_user_id, raw_json, imported_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
+    )
+      .bind(
+        source,
+        user.wp_user_id,
+        user.user_login ?? null,
+        user.display_name ?? null,
+        user.email ?? null,
+        user.line_user_id,
+        JSON.stringify(user)
+      )
+      .run();
+    imported += 1;
+
+    const synced = await env.DB.prepare(
+      `SELECT provider_key, shop_id, line_user_id, member_id
+       FROM synced_point_accounts
+       WHERE line_user_id = ?`
+    )
+      .bind(user.line_user_id)
+      .all<{ provider_key: ProviderKey; shop_id: number; line_user_id: string; member_id: number | null }>();
+
+    for (const account of synced.results ?? []) {
+      const memberId =
+        account.member_id ??
+        (await createMember(env, {
+          displayName: user.display_name || user.user_login || `WP user ${user.wp_user_id}`,
+          email: user.email
+        }));
+      if (!account.member_id) createdMembers += 1;
+
+      await bindLineAccount(env, {
+        memberId,
+        providerKey: account.provider_key,
+        shopId: account.shop_id,
+        lineUserId: account.line_user_id
+      });
+      linkedAccounts += 1;
+    }
+  }
+
+  return { imported, linked_accounts: linkedAccounts, created_members: createdMembers };
+}

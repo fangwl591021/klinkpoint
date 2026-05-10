@@ -191,3 +191,11 @@ Settings -> KlinkPoint Users
 curl "https://k-link.cc/wp-json/klinkpoint/v1/users?role=wetw_ai_vip&per_page=100" \
   -H "x-klinkpoint-api-key: YOUR_PLUGIN_API_KEY"
 ```
+
+If you only have WordPress admin login access and cannot install plugins, use:
+
+```text
+docs/wp-admin-console-export.md
+```
+
+That flow runs a browser console script inside `wp-admin` and imports detected LINE UIDs into KlinkPoint.
