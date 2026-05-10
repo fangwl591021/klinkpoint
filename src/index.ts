@@ -1,6 +1,7 @@
 import { getMemberAccount, getMemberAccounts, bindLineAccount, createMember, hasOperation, recordOperation } from "./db";
 import { handleError, HttpError, json, readJson, requireAdmin, requireFields } from "./http";
 import { getShopId, insertPoint, queryPointList } from "./pointApi";
+import { html, renderApp } from "./ui";
 import type { Env, PointListItem, ProviderKey } from "./types";
 
 type RouteHandler = (request: Request, env: Env) => Promise<Response>;
@@ -61,6 +62,10 @@ async function healthRoute(_request: Request, env: Env): Promise<Response> {
       oa2_shop_id: env.OA2_SHOP_ID
     }
   });
+}
+
+async function appRoute(): Promise<Response> {
+  return html(renderApp());
 }
 
 async function createMemberRoute(request: Request, env: Env): Promise<Response> {
@@ -263,7 +268,7 @@ async function redeemRoute(request: Request, env: Env): Promise<Response> {
 }
 
 const routes: Record<string, RouteHandler> = {
-  "GET /": healthRoute,
+  "GET /": appRoute,
   "GET /health": healthRoute,
   "POST /api/members": createMemberRoute,
   "POST /api/member/link": linkAccountRoute,
