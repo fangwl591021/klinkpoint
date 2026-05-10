@@ -1,0 +1,13 @@
+name = "klinkpoint"
+main = "src/index.ts"
+compatibility_date = "2026-05-10"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "klinkpoint"
+database_id = "bae6fc8a-b5c2-4b09-83b0-30b5fd20ac66"
+
+[vars]
+POINT_API_BASE_URL = "https://aiwe.cc/index.php/wp-json/wetw-point/v1"
+OA1_SHOP_ID = "1086"
+OA2_SHOP_ID = "1584"
