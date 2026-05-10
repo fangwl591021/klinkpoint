@@ -249,6 +249,27 @@ export function renderApp(): string {
       </section>
 
       <section>
+        <h2>批次同步</h2>
+        <div class="row">
+          <div>
+            <label for="syncProvider">Provider</label>
+            <select id="syncProvider">
+              <option value="oa1">OA1</option>
+              <option value="oa2">OA2</option>
+            </select>
+          </div>
+          <div>
+            <label for="syncPages">頁數上限</label>
+            <input id="syncPages" inputmode="numeric" value="50">
+          </div>
+        </div>
+        <div class="actions">
+          <button id="syncProviderButton">同步點數</button>
+          <button class="secondary" id="searchAccounts">搜尋帳號</button>
+        </div>
+      </section>
+
+      <section>
         <h2>LINEOA 綁定</h2>
         <div class="row">
           <div>
@@ -297,6 +318,38 @@ export function renderApp(): string {
     </div>
 
     <div class="stack">
+      <section>
+        <h2>同步帳號</h2>
+        <div class="row">
+          <div>
+            <label for="accountProvider">Provider</label>
+            <select id="accountProvider">
+              <option value="">全部</option>
+              <option value="oa1">OA1</option>
+              <option value="oa2">OA2</option>
+            </select>
+          </div>
+          <div>
+            <label for="accountSearch">搜尋</label>
+            <input id="accountSearch" placeholder="LINE_user_id 或 user_id">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="mergeOa1">OA1 LINE User ID</label>
+            <input id="mergeOa1" placeholder="從下方帳號選取">
+          </div>
+          <div>
+            <label for="mergeOa2">OA2 LINE User ID</label>
+            <input id="mergeOa2" placeholder="從下方帳號選取">
+          </div>
+        </div>
+        <div class="actions">
+          <button id="mergeAccounts">合併成會員</button>
+        </div>
+        <div class="table-wrap" id="accounts"></div>
+      </section>
+
       <section>
         <h2>整併餘額</h2>
         <div class="summary" id="summary"></div>
@@ -381,6 +434,29 @@ export function renderApp(): string {
         '</tbody></table>';
     }
 
+    function renderAccounts(accounts) {
+      if (!accounts || !accounts.length) {
+        $("accounts").innerHTML = '<div class="empty">尚無同步帳號</div>';
+        return;
+      }
+
+      $("accounts").innerHTML = '<table><thead><tr><th>OA</th><th>LINE User ID</th><th>WP user_id</th><th>餘額</th><th>會員</th><th></th></tr></thead><tbody>' +
+        accounts.map((account) => {
+          const balanceText = Object.entries(account.balances || {}).map(([key, value]) => key + ': ' + value).join(', ');
+          const selectButton = '<button class="secondary" data-provider="' + escapeHtml(account.provider_key) + '" data-line="' + escapeHtml(account.line_user_id) + '">選取</button>';
+          return '<tr><td>' + escapeHtml(account.provider_key) + '</td><td>' + escapeHtml(account.line_user_id) + '</td><td>' + escapeHtml(account.wp_user_id || '') + '</td><td>' + escapeHtml(balanceText || '{}') + '</td><td>' + escapeHtml(account.member_id || '') + '</td><td>' + selectButton + '</td></tr>';
+        }).join("") +
+        '</tbody></table>';
+
+      $("accounts").querySelectorAll("button[data-provider]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.dataset.provider === "oa1" ? "mergeOa1" : "mergeOa2";
+          $(target).value = button.dataset.line || "";
+          setMessage("已選取 " + button.dataset.provider + " 帳號", "ok");
+        });
+      });
+    }
+
     function escapeHtml(value) {
       return String(value)
         .replaceAll("&", "&amp;")
@@ -396,6 +472,16 @@ export function renderApp(): string {
       renderSummary(data.total);
       renderHistory(data.providers);
       setMessage("查詢完成", "ok");
+    }
+
+    async function loadAccounts() {
+      const params = new URLSearchParams();
+      if ($("accountProvider").value) params.set("provider_key", $("accountProvider").value);
+      if ($("accountSearch").value) params.set("q", $("accountSearch").value);
+      params.set("limit", "100");
+      const data = await api("/api/synced/accounts?" + params.toString());
+      renderAccounts(data.accounts);
+      setMessage("帳號搜尋完成", "ok");
     }
 
     $("createMember").addEventListener("click", () => run(async () => {
@@ -424,6 +510,34 @@ export function renderApp(): string {
     }));
 
     $("loadSummary").addEventListener("click", () => run(loadSummary));
+
+    $("syncProviderButton").addEventListener("click", () => run(async () => {
+      const data = await api("/api/sync/provider", {
+        method: "POST",
+        body: JSON.stringify({
+          provider_key: $("syncProvider").value,
+          max_pages: Number($("syncPages").value || 50)
+        })
+      });
+      setMessage("同步完成：" + data.synced_entries + " 筆明細，觸及 " + data.touched_accounts + " 個帳號", "ok");
+      await loadAccounts();
+    }));
+
+    $("searchAccounts").addEventListener("click", () => run(loadAccounts));
+
+    $("mergeAccounts").addEventListener("click", () => run(async () => {
+      const data = await api("/api/synced/merge", {
+        method: "POST",
+        body: JSON.stringify({
+          oa1_LINE_user_id: $("mergeOa1").value || undefined,
+          oa2_LINE_user_id: $("mergeOa2").value || undefined
+        })
+      });
+      $("memberId").value = data.member_id;
+      setMessage("已合併成會員：" + data.member_id, "ok");
+      await loadAccounts();
+      await loadSummary();
+    }));
 
     $("checkin").addEventListener("click", () => run(async () => {
       await api("/api/points/checkin", {

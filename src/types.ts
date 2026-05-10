@@ -41,6 +41,16 @@ export interface QueryPointListResponse {
   };
 }
 
+export interface QueryPointListResult {
+  list: PointListItem[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+  };
+}
+
 export interface InsertPointResponse {
   success: boolean;
   code: string;
@@ -62,4 +72,15 @@ export interface MemberLineAccount {
   provider_key: ProviderKey;
   shop_id: number;
   line_user_id: string;
+}
+
+export interface SyncedPointAccount {
+  provider_key: ProviderKey;
+  shop_id: number;
+  line_user_id: string;
+  wp_user_id: string | null;
+  balances_json: string;
+  last_point_at: string | null;
+  synced_at: string;
+  member_id: number | null;
 }

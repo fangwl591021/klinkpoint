@@ -1,4 +1,4 @@
-import type { Env, InsertPointResponse, PointListItem, ProviderKey, QueryPointListResponse } from "./types";
+import type { Env, InsertPointResponse, PointListItem, ProviderKey, QueryPointListResponse, QueryPointListResult } from "./types";
 import { HttpError } from "./http";
 
 export function getShopId(env: Env, providerKey: ProviderKey): number {
@@ -26,7 +26,7 @@ async function postPointApi<T>(env: Env, path: string, payload: Record<string, u
 export async function queryPointList(
   env: Env,
   options: {
-    lineUserId: string;
+    lineUserId?: string;
     shopId: number;
     pointType?: string;
     dateStart?: string;
@@ -35,6 +35,22 @@ export async function queryPointList(
     perPage?: number;
   }
 ): Promise<PointListItem[]> {
+  const result = await queryPointPage(env, options);
+  return result.list;
+}
+
+export async function queryPointPage(
+  env: Env,
+  options: {
+    lineUserId?: string;
+    shopId: number;
+    pointType?: string;
+    dateStart?: string;
+    dateEnd?: string;
+    page?: number;
+    perPage?: number;
+  }
+): Promise<QueryPointListResult> {
   const result = await postPointApi<QueryPointListResponse>(env, "/query-user-point-list", {
     LINE_user_id: options.lineUserId,
     shop_id: options.shopId,
@@ -45,7 +61,15 @@ export async function queryPointList(
     per_page: Math.min(options.perPage ?? 100, 100)
   });
 
-  return result.data?.list ?? [];
+  return {
+    list: result.data?.list ?? [],
+    pagination: result.data?.pagination ?? {
+      page: options.page ?? 1,
+      per_page: Math.min(options.perPage ?? 100, 100),
+      total: 0,
+      total_pages: 0
+    }
+  };
 }
 
 export async function insertPoint(

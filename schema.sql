@@ -32,3 +32,38 @@ CREATE TABLE IF NOT EXISTS point_operations (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(member_id) REFERENCES members(id)
 );
+
+CREATE TABLE IF NOT EXISTS synced_point_accounts (
+  provider_key TEXT NOT NULL CHECK (provider_key IN ('oa1', 'oa2')),
+  shop_id INTEGER NOT NULL,
+  line_user_id TEXT NOT NULL,
+  wp_user_id TEXT,
+  balances_json TEXT NOT NULL DEFAULT '{}',
+  last_point_at TEXT,
+  synced_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  member_id INTEGER,
+  PRIMARY KEY(provider_key, line_user_id),
+  FOREIGN KEY(member_id) REFERENCES members(id)
+);
+
+CREATE TABLE IF NOT EXISTS synced_point_entries (
+  provider_key TEXT NOT NULL CHECK (provider_key IN ('oa1', 'oa2')),
+  point_id TEXT NOT NULL,
+  wp_user_id TEXT,
+  line_user_id TEXT NOT NULL,
+  shop_id INTEGER NOT NULL,
+  event_name TEXT,
+  event_content TEXT,
+  point_type TEXT NOT NULL,
+  get_point REAL NOT NULL,
+  point_balance REAL,
+  created_at TEXT NOT NULL,
+  raw_json TEXT NOT NULL,
+  PRIMARY KEY(provider_key, point_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_synced_point_accounts_member_id
+  ON synced_point_accounts(member_id);
+
+CREATE INDEX IF NOT EXISTS idx_synced_point_entries_line_user
+  ON synced_point_entries(provider_key, line_user_id);

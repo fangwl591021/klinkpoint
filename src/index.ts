@@ -1,6 +1,16 @@
-import { getMemberAccount, getMemberAccounts, bindLineAccount, createMember, hasOperation, recordOperation } from "./db";
+import {
+  getMemberAccount,
+  getMemberAccounts,
+  bindLineAccount,
+  createMember,
+  hasOperation,
+  mergeSyncedAccounts,
+  recordOperation,
+  saveSyncedPointItems,
+  searchSyncedAccounts
+} from "./db";
 import { handleError, HttpError, json, readJson, requireAdmin, requireFields } from "./http";
-import { getShopId, insertPoint, queryPointList } from "./pointApi";
+import { getShopId, insertPoint, queryPointList, queryPointPage } from "./pointApi";
 import { html, renderApp } from "./ui";
 import type { Env, PointListItem, ProviderKey } from "./types";
 
@@ -140,6 +150,74 @@ async function pointsSummaryRoute(request: Request, env: Env): Promise<Response>
   });
 }
 
+async function syncProviderRoute(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<Record<string, unknown>>(request);
+  requireFields(body, ["provider_key"]);
+
+  const providerKey = parseProviderKey(body.provider_key);
+  const shopId = body.shop_id ? numberFrom(body.shop_id, "shop_id") : getShopId(env, providerKey);
+  const maxPages = Math.min(numberFrom(body.max_pages ?? 50, "max_pages"), 500);
+  const perPage = Math.min(numberFrom(body.per_page ?? 100, "per_page"), 100);
+  let page = Math.max(numberFrom(body.page_start ?? 1, "page_start"), 1);
+  let totalPages = 1;
+  let totalEntries = 0;
+  let totalAccounts = 0;
+
+  while (page <= totalPages && page < Number(body.page_start ?? 1) + maxPages) {
+    const result = await queryPointPage(env, {
+      shopId,
+      page,
+      perPage
+    });
+    const saved = await saveSyncedPointItems(env, providerKey, result.list);
+    totalEntries += saved.entries;
+    totalAccounts += saved.accounts;
+    totalPages = Math.max(result.pagination.total_pages || 1, 1);
+    if (!result.list.length) break;
+    page += 1;
+  }
+
+  return json({
+    success: true,
+    provider_key: providerKey,
+    shop_id: shopId,
+    synced_entries: totalEntries,
+    touched_accounts: totalAccounts,
+    next_page: page <= totalPages ? page : null,
+    total_pages: totalPages
+  });
+}
+
+async function syncedAccountsRoute(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const providerParam = url.searchParams.get("provider_key");
+  const providerKey = providerParam ? parseProviderKey(providerParam) : undefined;
+  const accounts = await searchSyncedAccounts(env, {
+    providerKey,
+    query: url.searchParams.get("q") ?? undefined,
+    limit: Number(url.searchParams.get("limit") ?? 50)
+  });
+
+  return json({
+    success: true,
+    accounts: accounts.map((account) => ({
+      ...account,
+      balances: JSON.parse(account.balances_json || "{}")
+    }))
+  });
+}
+
+async function mergeSyncedRoute(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<Record<string, unknown>>(request);
+  const memberId = await mergeSyncedAccounts(env, {
+    displayName: body.display_name ? String(body.display_name) : undefined,
+    oa1LineUserId: body.oa1_LINE_user_id ? String(body.oa1_LINE_user_id) : undefined,
+    oa2LineUserId: body.oa2_LINE_user_id ? String(body.oa2_LINE_user_id) : undefined
+  });
+
+  return json({ success: true, member_id: memberId });
+}
+
 async function checkinRoute(request: Request, env: Env): Promise<Response> {
   const body = await readJson<Record<string, unknown>>(request);
   requireFields(body, ["member_id", "provider_key"]);
@@ -273,6 +351,9 @@ const routes: Record<string, RouteHandler> = {
   "POST /api/members": createMemberRoute,
   "POST /api/member/link": linkAccountRoute,
   "GET /api/points/summary": pointsSummaryRoute,
+  "POST /api/sync/provider": syncProviderRoute,
+  "GET /api/synced/accounts": syncedAccountsRoute,
+  "POST /api/synced/merge": mergeSyncedRoute,
   "POST /api/points/checkin": checkinRoute,
   "POST /api/points/grant": grantRoute,
   "POST /api/points/redeem": redeemRoute
