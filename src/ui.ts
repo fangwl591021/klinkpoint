@@ -264,7 +264,9 @@ export function renderApp(): string {
           </div>
         </div>
         <div class="actions">
+          <button id="syncBothButton">同步兩邊</button>
           <button id="syncProviderButton">同步點數</button>
+          <button class="secondary" id="autoMerge">自動合併</button>
           <button class="secondary" id="searchAccounts">搜尋帳號</button>
         </div>
       </section>
@@ -320,6 +322,7 @@ export function renderApp(): string {
     <div class="stack">
       <section>
         <h2>同步帳號</h2>
+        <div class="message">不用先準備 LINE User ID。請先同步點數，系統會從 API 回傳資料建立帳號清單。</div>
         <div class="row">
           <div>
             <label for="accountProvider">Provider</label>
@@ -520,6 +523,29 @@ export function renderApp(): string {
         })
       });
       setMessage("同步完成：" + data.synced_entries + " 筆明細，觸及 " + data.touched_accounts + " 個帳號", "ok");
+      await loadAccounts();
+    }));
+
+    $("syncBothButton").addEventListener("click", () => run(async () => {
+      const maxPages = Number($("syncPages").value || 50);
+      const oa1 = await api("/api/sync/provider", {
+        method: "POST",
+        body: JSON.stringify({ provider_key: "oa1", max_pages: maxPages })
+      });
+      const oa2 = await api("/api/sync/provider", {
+        method: "POST",
+        body: JSON.stringify({ provider_key: "oa2", max_pages: maxPages })
+      });
+      setMessage("同步完成：OA1 " + oa1.synced_entries + " 筆，OA2 " + oa2.synced_entries + " 筆", "ok");
+      await loadAccounts();
+    }));
+
+    $("autoMerge").addEventListener("click", () => run(async () => {
+      const data = await api("/api/synced/auto-merge", {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      setMessage("自動合併完成：" + data.merged + " 組，略過 " + data.skipped + " 組", "ok");
       await loadAccounts();
     }));
 

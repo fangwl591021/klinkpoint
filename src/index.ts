@@ -4,6 +4,7 @@ import {
   bindLineAccount,
   createMember,
   hasOperation,
+  autoMergeByWpUserId,
   mergeSyncedAccounts,
   recordOperation,
   saveSyncedPointItems,
@@ -218,6 +219,11 @@ async function mergeSyncedRoute(request: Request, env: Env): Promise<Response> {
   return json({ success: true, member_id: memberId });
 }
 
+async function autoMergeRoute(_request: Request, env: Env): Promise<Response> {
+  const result = await autoMergeByWpUserId(env);
+  return json({ success: true, ...result });
+}
+
 async function checkinRoute(request: Request, env: Env): Promise<Response> {
   const body = await readJson<Record<string, unknown>>(request);
   requireFields(body, ["member_id", "provider_key"]);
@@ -354,6 +360,7 @@ const routes: Record<string, RouteHandler> = {
   "POST /api/sync/provider": syncProviderRoute,
   "GET /api/synced/accounts": syncedAccountsRoute,
   "POST /api/synced/merge": mergeSyncedRoute,
+  "POST /api/synced/auto-merge": autoMergeRoute,
   "POST /api/points/checkin": checkinRoute,
   "POST /api/points/grant": grantRoute,
   "POST /api/points/redeem": redeemRoute

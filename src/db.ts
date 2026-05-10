@@ -272,3 +272,50 @@ export async function mergeSyncedAccounts(
 
   return memberId;
 }
+
+export async function autoMergeByWpUserId(env: Env): Promise<{
+  merged: number;
+  skipped: number;
+  members: number[];
+}> {
+  const result = await env.DB.prepare(
+    `SELECT wp_user_id
+     FROM synced_point_accounts
+     WHERE wp_user_id IS NOT NULL AND wp_user_id != ''
+     GROUP BY wp_user_id
+     HAVING COUNT(DISTINCT provider_key) > 1`
+  ).all<{ wp_user_id: string }>();
+
+  const members: number[] = [];
+  let skipped = 0;
+
+  for (const row of result.results ?? []) {
+    const accounts = await env.DB.prepare(
+      `SELECT provider_key, line_user_id
+       FROM synced_point_accounts
+       WHERE wp_user_id = ?`
+    )
+      .bind(row.wp_user_id)
+      .all<{ provider_key: ProviderKey; line_user_id: string }>();
+
+    const oa1 = accounts.results?.find((account) => account.provider_key === "oa1")?.line_user_id;
+    const oa2 = accounts.results?.find((account) => account.provider_key === "oa2")?.line_user_id;
+    if (!oa1 || !oa2) {
+      skipped += 1;
+      continue;
+    }
+
+    const memberId = await mergeSyncedAccounts(env, {
+      displayName: `WP user ${row.wp_user_id}`,
+      oa1LineUserId: oa1,
+      oa2LineUserId: oa2
+    });
+    members.push(memberId);
+  }
+
+  return {
+    merged: members.length,
+    skipped,
+    members
+  };
+}
